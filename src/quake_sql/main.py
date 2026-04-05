@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import math
+import os
 from pathlib import Path
 from typing import Any
 
@@ -81,12 +82,22 @@ def index(request: Request, settings: Settings = Depends(get_settings)) -> HTMLR
     )
 
 
+@app.on_event("startup")
+def _warm_clickhouse() -> None:
+    """Send a lightweight query to wake ClickHouse Cloud from idle."""
+    try:
+        service = get_query_service()
+        service.client.command("SELECT 1")
+    except Exception:
+        pass
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-_EVAL_LOG_DIR = str(Path(__file__).resolve().parents[2] / "logs" / "inspect")
+_EVAL_LOG_DIR = str(Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2])) / "logs" / "inspect")
 _EVAL_GENERATION_MODES = [GENERATION_MODE_CFG, GENERATION_MODE_NO_CFG]
 
 
