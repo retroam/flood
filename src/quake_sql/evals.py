@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import date, datetime
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Sequence
@@ -68,12 +69,19 @@ def generation_mode_for_eval_log(eval_log: EvalLog) -> str:
     return GENERATION_MODE_CFG
 
 
+def _project_root() -> Path:
+    env = os.environ.get("PROJECT_ROOT")
+    if env:
+        return Path(env)
+    return Path(__file__).resolve().parents[2]
+
+
 def _cases_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "evals" / "cases.json"
+    return _project_root() / "evals" / "cases.json"
 
 
 def _model_costs_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "evals" / "model_costs.json"
+    return _project_root() / "evals" / "model_costs.json"
 
 
 def load_cases() -> list[dict[str, Any]]:
