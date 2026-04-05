@@ -330,10 +330,23 @@ button {
   display: block;
 }
 
-/* ── SQL section ── */
+/* ── SQL + Result row ── */
 
-.sql-section {
+.sql-result-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.sql-result-row > .output-panel {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .sql-result-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .output-panel {
@@ -349,12 +362,15 @@ button {
 .collapsible-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
   cursor: pointer;
   list-style: none;
   user-select: none;
+}
+
+.collapsible-header .muted {
+  margin-left: auto;
 }
 
 .collapsible-header::-webkit-details-marker {
@@ -507,7 +523,7 @@ h2 {
 
 .metrics-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
 }
@@ -539,6 +555,11 @@ h2 {
 
 .schema-table {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schema-table .result-table {
+  min-width: 600px;
 }
 
 .schema-rendered-table code {
@@ -683,7 +704,7 @@ h2 {
   min-width: 0;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .chart-row {
     grid-template-columns: 1fr;
   }
@@ -772,6 +793,16 @@ h2 {
   padding: 32px 24px;
   font-size: 0.78rem;
   color: var(--text-tertiary);
+}
+
+.footer a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.footer a:hover {
+  color: var(--text-secondary);
 }
 
 .footer-sep {

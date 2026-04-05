@@ -172,14 +172,23 @@ class OpenAISqlGenerator:
         return model_name
 
     def _extract_sql(self, response: Any) -> str:
+        tool_sql: str | None = None
+        message_sql: str | None = None
+
         for item in getattr(response, "output", []):
-            if getattr(item, "type", None) == "custom_tool_call":
-                return item.input
-            if getattr(item, "type", None) == "message":
+            if getattr(item, "type", None) == "custom_tool_call" and tool_sql is None:
+                tool_sql = item.input
+            elif getattr(item, "type", None) == "message" and message_sql is None:
                 for content in getattr(item, "content", []):
                     text = getattr(content, "text", "")
                     if text:
-                        return text
+                        message_sql = text
+                        break
+
+        if tool_sql:
+            return tool_sql
+        if message_sql:
+            return message_sql
         if getattr(response, "output_text", "").strip():
             return response.output_text
         raise SqlGenerationError(

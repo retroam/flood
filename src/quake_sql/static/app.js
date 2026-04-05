@@ -165,7 +165,6 @@ async function runQuery(event) {
     sqlOutput.classList.remove("placeholder-text");
     copySqlButton.style.display = "inline-block";
     renderMetrics(payload);
-    resultDetails.open = true;
     metricsDetails.open = true;
 
     if (payload.unsupported) {
@@ -276,9 +275,9 @@ function renderEvalModelLabel(activeModel) {
 function syncEvalSampleCountInput(data) {
   if (!evalSampleCountInput) return;
   const max = Number(data.max_sample_count ?? evalSampleCountInput.max ?? 25);
+  const loaded = data.selected_sample_count ?? data.summary?.[0]?.sample_count;
   const fallback = Number(data.default_sample_count ?? 3);
-  const current = Number.parseInt(evalSampleCountInput.value, 10);
-  const selected = Number.isFinite(current) ? current : fallback;
+  const selected = loaded ?? fallback;
   evalSampleCountInput.max = `${max}`;
   evalSampleCountInput.value = `${Math.min(Math.max(selected, 1), max)}`;
 }
@@ -528,7 +527,8 @@ function drawAccuracyCostChart(canvasId, data) {
   ctx.scale(dpr, dpr);
 
   const font = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  const padLeft = 66, padRight = 40, padTop = 30, padBottom = 52;
+  const bubbleR = 22;
+  const padLeft = 66, padRight = 40, padTop = bubbleR + 30, padBottom = 52;
   const plotW = w - padLeft - padRight;
   const plotH = h - padTop - padBottom;
 
@@ -536,7 +536,7 @@ function drawAccuracyCostChart(canvasId, data) {
   const accs = data.summary.map((item) => item.accuracy);
   const maxCost = Math.max(...costs, 0.0001) * 1.3;
   const minAcc = Math.max(0, Math.min(...accs) - 10);
-  const maxAcc = Math.min(100, Math.max(...accs) + 10);
+  const maxAcc = Math.max(...accs) + 5;
   const accRange = Math.max(maxAcc - minAcc, 1);
 
   function xPos(cost) { return padLeft + (cost / maxCost) * plotW; }
@@ -593,12 +593,32 @@ function drawAccuracyCostChart(canvasId, data) {
   ctx.fillText("\u2196 better", padLeft + 6, padTop + 16);
   ctx.restore();
 
-  // Plot points
-  const bubbleR = 22;
-  data.summary.forEach((m, i) => {
-    const x = xPos(m.cost_mean);
-    const y = yPos(m.accuracy);
-    const color = RD.models[i % RD.models.length];
+  // Plot points — compute positions first, then resolve callout collisions
+  const points = data.summary.map((m, i) => ({
+    m, i,
+    x: xPos(m.cost_mean),
+    y: yPos(m.accuracy),
+    color: RD.models[i % RD.models.length],
+  }));
+
+  // Default callout above; if two points are close, push the second one below
+  points.forEach((p) => { p.calloutY = p.y - bubbleR - 10; p.calloutAbove = true; });
+  for (let a = 0; a < points.length; a++) {
+    for (let b = a + 1; b < points.length; b++) {
+      const dx = points[a].x - points[b].x;
+      const dy = points[a].y - points[b].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < bubbleR * 3) {
+        // Place the lower-accuracy point's callout below its bubble
+        const lower = points[a].m.accuracy <= points[b].m.accuracy ? a : b;
+        points[lower].calloutY = points[lower].y + bubbleR + 16;
+        points[lower].calloutAbove = false;
+      }
+    }
+  }
+
+  points.forEach((p) => {
+    const { m, x, y, color, calloutY } = p;
 
     // Glow
     const glow = ctx.createRadialGradient(x, y, 0, x, y, bubbleR * 2);
@@ -628,7 +648,6 @@ function drawAccuracyCostChart(canvasId, data) {
     ctx.fillText(label, x, y);
 
     // Tooltip-style callout
-    const calloutY = y - bubbleR - 10;
     ctx.font = `500 10px ${font}`;
     ctx.fillStyle = RD.text;
     ctx.textAlign = "center";
@@ -669,20 +688,37 @@ function renderRationale(data) {
   const latencyDelta = cfg.latency_mean - noCfg.latency_mean;
   const costDelta = cfg.cost_mean - noCfg.cost_mean;
 
-  const accuracyVerb = accuracyDelta >= 0 ? "improved" : "reduced";
-  const sqlEquivVerb = sqlEquivDelta >= 0 ? "improved" : "reduced";
-  const hallucinationVerb = hallucinationDelta >= 0 ? "improved" : "reduced";
-  const latencyVerb = latencyDelta >= 0 ? "added" : "reduced";
-  const costVerb = costDelta >= 0 ? "added" : "reduced";
+  function describePointsDelta(delta, improved, reduced, metric, suffix) {
+    const abs = Math.abs(delta).toFixed(1);
+    if (abs === "0.0") return `CFG showed no change in ${metric} (${suffix}).`;
+    const verb = delta > 0 ? improved : reduced;
+    return `CFG ${verb} ${metric} by ${abs} points (${suffix}).`;
+  }
+
+  function describeLatencyDelta(delta, cfgVal, noCfgVal) {
+    const abs = Math.abs(delta).toFixed(2);
+    const suffix = `${cfgVal}s vs ${noCfgVal}s`;
+    if (abs === "0.00") return `CFG showed no meaningful latency change (${suffix}).`;
+    const verb = delta > 0 ? "added" : "saved";
+    return `CFG ${verb} ${abs}s of mean latency (${suffix}).`;
+  }
+
+  function describeCostDelta(delta, cfgVal, noCfgVal) {
+    const abs = Math.abs(delta).toFixed(4);
+    const suffix = `$${cfgVal.toFixed(4)} vs $${noCfgVal.toFixed(4)}`;
+    if (abs === "0.0000") return `CFG showed no meaningful cost difference (${suffix}).`;
+    const verb = delta > 0 ? "added" : "saved";
+    return `CFG ${verb} $${abs} per query on average (${suffix}).`;
+  }
 
   el.innerHTML = `
     <p>We evaluated <span class="model-winner">${escapeHtml(activeModel)}</span> across the same ${sampleCount} benchmark cases with and without CFG.</p>
     <ul>
-      <li><strong>Result accuracy:</strong> CFG ${accuracyVerb} result-set accuracy by ${formatSigned(accuracyDelta, 1)} points (${cfg.accuracy}% vs ${noCfg.accuracy}%). Compares query outputs on shared columns.</li>
-      <li><strong>SQL equivalence:</strong> CFG ${sqlEquivVerb} SQL-structure match by ${formatSigned(sqlEquivDelta, 1)} points (${cfg.sql_equivalence || 0}% vs ${noCfg.sql_equivalence || 0}%). Compares WHERE/GROUP BY/ORDER BY/LIMIT, ignoring column selection.</li>
-      <li><strong>Hallucination control:</strong> CFG ${hallucinationVerb} schema-safety pass rate by ${formatSigned(hallucinationDelta, 1)} points (${cfg.hallucination}% vs ${noCfg.hallucination}%).</li>
-      <li><strong>Latency:</strong> CFG ${latencyVerb} ${Math.abs(latencyDelta).toFixed(2)}s of mean latency (${cfg.latency_mean}s vs ${noCfg.latency_mean}s).</li>
-      <li><strong>Cost:</strong> CFG ${costVerb} $${Math.abs(costDelta).toFixed(4)} per query on average ($${cfg.cost_mean.toFixed(4)} vs $${noCfg.cost_mean.toFixed(4)}).</li>
+      <li><strong>Result accuracy:</strong> ${describePointsDelta(accuracyDelta, "improved", "reduced", "result-set accuracy", `${cfg.accuracy}% vs ${noCfg.accuracy}%`)} Compares query outputs on shared columns.</li>
+      <li><strong>SQL equivalence:</strong> ${describePointsDelta(sqlEquivDelta, "improved", "reduced", "SQL-structure match", `${cfg.sql_equivalence || 0}% vs ${noCfg.sql_equivalence || 0}%`)} Compares WHERE/GROUP BY/ORDER BY/LIMIT, ignoring column selection.</li>
+      <li><strong>Hallucination control:</strong> ${describePointsDelta(hallucinationDelta, "improved", "reduced", "schema-safety pass rate", `${cfg.hallucination}% vs ${noCfg.hallucination}%`)}</li>
+      <li><strong>Latency:</strong> ${describeLatencyDelta(latencyDelta, cfg.latency_mean, noCfg.latency_mean)}</li>
+      <li><strong>Cost:</strong> ${describeCostDelta(costDelta, cfg.cost_mean, noCfg.cost_mean)}</li>
     </ul>
   `;
 }

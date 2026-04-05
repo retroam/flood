@@ -11,6 +11,8 @@ from quake_sql.schema import ALL_COLUMNS, TABLE_NAME
 
 ALLOWED_COLUMNS = set(ALL_COLUMNS)
 
+_TODAY_DAY_RE = re.compile(r"\btoday\(\)\s*-\s*(\d+)\s+DAY\b", re.IGNORECASE)
+
 
 class SqlValidationError(ValueError):
     pass
@@ -80,6 +82,7 @@ def validate_sql(
     question: str | None = None,
 ) -> ValidatedSql:
     normalized = normalize_output(raw_text)
+    normalized = _TODAY_DAY_RE.sub(r"today() - \1", normalized)
     if normalized.upper() == "UNSUPPORTED":
         return ValidatedSql(sql="UNSUPPORTED", unsupported=True)
 

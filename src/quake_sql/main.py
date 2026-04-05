@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import logging
 import math
 import os
 from pathlib import Path
@@ -85,6 +86,13 @@ def index(request: Request, settings: Settings = Depends(get_settings)) -> HTMLR
 @app.on_event("startup")
 def _warm_clickhouse() -> None:
     """Send a lightweight query to wake ClickHouse Cloud from idle."""
+    log_path = Path(_EVAL_LOG_DIR)
+    eval_files = list(log_path.glob("*.eval")) if log_path.exists() else []
+    logger.info("eval log dir: %s (exists=%s, eval_files=%d)", _EVAL_LOG_DIR, log_path.exists(), len(eval_files))
+    if eval_files:
+        logger.info("eval files: %s", [f.name for f in eval_files])
+    else:
+        logger.warning("no eval files found in %s", _EVAL_LOG_DIR)
     try:
         service = get_query_service()
         service.client.command("SELECT 1")
@@ -106,6 +114,8 @@ def _resolve_project_root() -> Path:
         return Path.cwd()
     return candidate
 
+
+logger = logging.getLogger(__name__)
 
 _EVAL_LOG_DIR = str(_resolve_project_root() / "logs" / "inspect")
 _EVAL_GENERATION_MODES = [GENERATION_MODE_CFG, GENERATION_MODE_NO_CFG]
@@ -252,6 +262,7 @@ def _eval_data(
     run_errors: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     active_model = _eval_model(settings)
+    logger.info("loading evals: dir=%s, model=%s, modes=%s", _EVAL_LOG_DIR, active_model, _EVAL_GENERATION_MODES)
     paths = latest_successful_log_paths(
         log_dir=_EVAL_LOG_DIR,
         models=[active_model],
@@ -259,8 +270,10 @@ def _eval_data(
         min_samples=1,
     )
     if not paths:
+        logger.warning("no matching eval logs found for model=%s in %s", active_model, _EVAL_LOG_DIR)
         return _empty_eval_data(settings, run_errors=run_errors)
 
+    logger.info("loaded %d eval log(s): %s", len(paths), [p.name for p in paths])
     summary_df = comparison_summary_dataframe(paths)
     samples_df = comparison_samples_dataframe(paths)
     return _build_eval_data(settings, summary_df, samples_df, run_errors=run_errors)
