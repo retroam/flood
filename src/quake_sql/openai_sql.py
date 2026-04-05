@@ -117,7 +117,7 @@ class OpenAISqlGenerator:
             "input": prompt,
             "reasoning": {"effort": self.settings.openai_reasoning_effort},
         }
-        if temperature is not None:
+        if temperature is not None and "reasoning" not in request_kwargs:
             request_kwargs["temperature"] = temperature
         if use_cfg:
             request_kwargs.update(

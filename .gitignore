@@ -4,7 +4,9 @@ __pycache__/
 .ipynb_checkpoints/
 data/raw_earthquakes_month.csv
 data/earthquakes_transformed.csv
-logs/
+logs/inspect/
+logs/inspect-smoke/
+logs/inspect-smoke-2/
 dist/
 build/
 

@@ -8,6 +8,7 @@ WORKDIR /app
 COPY pyproject.toml README.md /app/
 COPY src /app/src
 COPY evals /app/evals
+COPY logs/seed /app/logs/inspect
 
 RUN pip install --no-cache-dir uv \
     && uv pip install --system .
