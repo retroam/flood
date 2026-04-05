@@ -97,7 +97,17 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-_EVAL_LOG_DIR = str(Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2])) / "logs" / "inspect")
+def _resolve_project_root() -> Path:
+    env = os.environ.get("PROJECT_ROOT")
+    if env:
+        return Path(env)
+    candidate = Path(__file__).resolve().parents[2]
+    if "site-packages" in str(candidate) or not (candidate / "logs").exists():
+        return Path.cwd()
+    return candidate
+
+
+_EVAL_LOG_DIR = str(_resolve_project_root() / "logs" / "inspect")
 _EVAL_GENERATION_MODES = [GENERATION_MODE_CFG, GENERATION_MODE_NO_CFG]
 
 

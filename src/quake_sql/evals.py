@@ -73,7 +73,14 @@ def _project_root() -> Path:
     env = os.environ.get("PROJECT_ROOT")
     if env:
         return Path(env)
-    return Path(__file__).resolve().parents[2]
+    # When installed as a package (e.g. via pip install), __file__ lives in
+    # site-packages and parents[2] resolves to the Python lib directory, not
+    # the project root.  Detect this and fall back to the current working
+    # directory which is set to the project root via WORKDIR in the Dockerfile.
+    candidate = Path(__file__).resolve().parents[2]
+    if "site-packages" in str(candidate) or not (candidate / "logs").exists():
+        return Path.cwd()
+    return candidate
 
 
 def _cases_path() -> Path:
