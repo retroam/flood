@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+data/raw_earthquakes_month.csv
+data/earthquakes_transformed.csv
+logs/
+dist/
+build/
+
+# Secrets
+.env
+.env.local
+.env.production
+
+# IDE / agent
+.claude/

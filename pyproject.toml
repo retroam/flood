@@ -1,0 +1,39 @@
+[project]
+name = "quake-sql"
+version = "0.1.0"
+description = "Natural language to ClickHouse SQL demo with GPT-5 CFG outputs and inspect-ai evals."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "clickhouse-connect>=0.15.1",
+  "fastapi>=0.115.12",
+  "httpx>=0.28.1",
+  "inspect-ai>=0.3.204",
+  "jinja2>=3.1.6",
+  "matplotlib>=3.10.1",
+  "nbformat>=5.10.4",
+  "openai>=2.30.0",
+  "pandas>=2.2.3",
+  "pydantic-settings>=2.10.1",
+  "python-dotenv>=1.1.0",
+  "sqlglot>=27.3.0",
+  "tabulate>=0.9.0",
+  "uvicorn[standard]>=0.34.2",
+]
+
+[dependency-groups]
+dev = [
+  "ipykernel>=6.29.5",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quake_sql"]
+
+[tool.uv]
+package = true

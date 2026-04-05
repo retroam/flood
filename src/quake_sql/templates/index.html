@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Natural Language + ClickHouse</p>
+        <h1>{{ app_name }}</h1>
+        <p class="lede">
+          Ask natural-language questions about the live USGS past-month earthquake feed.
+          The model generates constrained ClickHouse SQL, runs it, and returns the result set.
+        </p>
+      </section>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="query">Query</button>
+        <button class="tab" data-tab="evals">Eval Results</button>
+        <button class="tab" data-tab="architecture">Architecture</button>
+      </nav>
+
+      <!-- ── Query Tab ── -->
+      <div id="tab-query" class="tab-content active">
+        <section class="panel input-panel">
+          <form id="query-form">
+            <label for="question" class="label">Question <span class="shortcut-hint">Ctrl+Enter to submit</span></label>
+            <textarea
+              id="question"
+              name="question"
+              rows="3"
+              placeholder="How many earthquakes above magnitude 4 happened in the last 7 days?"
+            ></textarea>
+            <div class="actions">
+              <fieldset class="query-mode-control" aria-label="Query generation mode">
+                <legend class="query-mode-label">Mode</legend>
+                <label class="query-mode-option">
+                  <input type="radio" name="query-mode" value="cfg" checked />
+                  <span>CFG</span>
+                </label>
+                <label class="query-mode-option">
+                  <input type="radio" name="query-mode" value="no_cfg" />
+                  <span>No CFG</span>
+                </label>
+              </fieldset>
+              <button type="submit" id="submit-button">
+                <span class="btn-label">Run Query</span>
+                <span class="btn-spinner" aria-hidden="true"></span>
+              </button>
+              <span id="status" class="status">Ready.</span>
+            </div>
+          </form>
+          <p class="examples-label">Try an example:</p>
+          <div class="examples">
+            {% for example in examples %}
+            <button class="example-chip" data-example="{{ example }}">{{ example }}</button>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="sql-section">
+          <article class="panel output-panel">
+            <div class="panel-head">
+              <h2>Generated SQL</h2>
+              <div class="panel-head-actions">
+                <span class="muted" id="query-mode-badge">CFG enabled</span>
+                <button id="copy-sql" class="icon-btn" title="Copy SQL" style="display:none;">Copy</button>
+              </div>
+            </div>
+            <pre id="sql-output" class="code-block placeholder-text">Submit a question to see the generated SQL.</pre>
+          </article>
+        </section>
+
+        <details id="result-details" class="panel collapsible">
+          <summary class="collapsible-header">
+            <h2>Result Set <span id="row-badge" class="row-badge" style="display:none;"></span></h2>
+            <span class="muted">Live ClickHouse query</span>
+          </summary>
+          <div class="collapsible-body">
+            <div id="result-output" class="result-shell placeholder-text">No query has been run yet.</div>
+          </div>
+        </details>
+
+        <details id="metrics-details" class="panel collapsible">
+          <summary class="collapsible-header">
+            <h2>Run Metrics</h2>
+            <span class="muted">Latency and estimated API cost</span>
+          </summary>
+          <div class="collapsible-body">
+            <dl id="metrics-output" class="metrics-list">
+              <div><dt>Latency</dt><dd>n/a</dd></div>
+              <div><dt>Estimated cost</dt><dd>n/a</dd></div>
+              <div><dt>Total tokens</dt><dd>n/a</dd></div>
+            </dl>
+          </div>
+        </details>
+
+        <details class="panel collapsible">
+          <summary class="collapsible-header">
+            <h2>Schema</h2>
+            <span class="muted">Table: earthquakes</span>
+          </summary>
+          <div class="collapsible-body">
+            <div class="schema-table">{{ schema_html|safe }}</div>
+          </div>
+        </details>
+      </div>
+
+      <!-- ── Evals Tab ── -->
+      <div id="tab-evals" class="tab-content">
+        <section class="panel eval-section">
+          <div class="panel-head">
+            <div>
+              <h2>Run Evals</h2>
+              <span class="muted" id="eval-model-label">Current model: {{ eval_model }}</span>
+            </div>
+            <div class="panel-head-actions">
+              <label class="eval-count-control" for="eval-sample-count">
+                <span>Cases</span>
+                <input id="eval-sample-count" type="number" min="1" max="25" value="3" />
+              </label>
+              <button id="run-evals-button" class="eval-run-btn">Run Evals</button>
+            </div>
+          </div>
+          <p id="eval-run-status" class="eval-run-status">
+            Load the latest benchmark comparison for this model, or run fresh CFG vs No CFG evals.
+          </p>
+        </section>
+        <div id="evals-loading" class="panel evals-placeholder">Loading eval results...</div>
+        <div id="evals-content" style="display:none;">
+
+          <section class="panel eval-section">
+            <div class="panel-head">
+              <h2>CFG Impact</h2>
+              <span class="muted">How constraints change performance for the active model</span>
+            </div>
+            <div class="eval-rationale" id="eval-rationale"></div>
+          </section>
+
+          <div class="chart-row">
+            <section class="panel eval-section eval-section--feature">
+              <div class="panel-head">
+                <h2>Result Accuracy, SQL Equivalence &amp; Hallucination</h2>
+                <span class="muted">Pass rates for CFG and No CFG</span>
+              </div>
+              <div class="chart-container chart-container--tall">
+                <canvas id="chart-acc-hall"></canvas>
+              </div>
+            </section>
+
+            <section class="panel eval-section eval-section--feature">
+              <div class="panel-head">
+                <h2>Accuracy vs. Cost</h2>
+                <span class="muted">CFG vs No CFG tradeoff</span>
+              </div>
+              <div class="chart-container chart-container--scatter">
+                <canvas id="chart-acc-cost"></canvas>
+              </div>
+            </section>
+          </div>
+
+          <div class="chart-row">
+            <section class="panel eval-section">
+              <div class="panel-head">
+                <h2>Accuracy</h2>
+                <span class="muted">Correct result sets</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-accuracy"></canvas>
+              </div>
+            </section>
+
+            <section class="panel eval-section">
+              <div class="panel-head">
+                <h2>Hallucination Control</h2>
+                <span class="muted">Schema-safe queries</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-hallucination"></canvas>
+              </div>
+            </section>
+          </div>
+
+          <div class="chart-row">
+            <section class="panel eval-section">
+              <div class="panel-head">
+                <h2>Latency</h2>
+                <span class="muted">Mean response time</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-latency"></canvas>
+              </div>
+            </section>
+
+            <section class="panel eval-section">
+              <div class="panel-head">
+                <h2>Cost per Query</h2>
+                <span class="muted">Mean estimated API cost</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-cost"></canvas>
+              </div>
+            </section>
+          </div>
+
+          <details class="panel collapsible">
+            <summary class="collapsible-header">
+              <h2>Full Comparison</h2>
+              <span class="muted">All metrics side by side</span>
+            </summary>
+            <div class="collapsible-body">
+              <div id="eval-summary-table" class="schema-table"></div>
+            </div>
+          </details>
+
+          <details class="panel collapsible">
+            <summary class="collapsible-header">
+              <h2>Per-Sample Results</h2>
+              <span class="muted">Individual test case outcomes</span>
+            </summary>
+            <div class="collapsible-body">
+              <div id="eval-samples-table" class="schema-table" style="overflow-x:auto;"></div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <!-- ── Architecture Tab ── -->
+      <div id="tab-architecture" class="tab-content">
+
+        <section class="panel arch-section">
+          <div class="panel-head">
+            <h2>Overview</h2>
+          </div>
+          <p class="arch-text">
+            Quake SQL turns plain-English questions into live ClickHouse queries against the
+            USGS earthquake feed. The app now has two runtime loops: a <strong>query path</strong>
+            that generates and executes SQL for a user question, and an <strong>eval path</strong>
+            that runs the same benchmark cases twice for the currently configured model,
+            once with CFG and once without it. That makes the eval tab a direct ablation of
+            the grammar constraint instead of a static multi-model report.
+          </p>
+        </section>
+
+        <section class="panel arch-section">
+          <div class="panel-head">
+            <h2>Request Flow</h2>
+          </div>
+          <pre class="mermaid">
+flowchart LR
+    A["User\nQuestion"] --> B["FastAPI\n/api/query"]
+    B --> C["OpenAI\nResponses API"]
+    C -- "Lark grammar\nconstraint" --> D["Generated\nSQL"]
+    D --> E{"SQL\nValidator"}
+    E -- "Valid" --> F["ClickHouse\nExecution"]
+    E -- "Invalid" --> C
+    F --> G["Result Set\n+ Metrics"]
+    G --> H["UI\nResponse"]
+
+    style A fill:#cceaf2,stroke:#1164a3,color:#1d1c1d
+    style B fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style C fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style D fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style E fill:#fff3cd,stroke:#f59e0b,color:#1d1c1d
+    style F fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style G fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style H fill:#cceaf2,stroke:#1164a3,color:#1d1c1d
+          </pre>
+        </section>
+
+        <section class="panel arch-section">
+          <div class="panel-head">
+            <h2>System Architecture</h2>
+          </div>
+          <pre class="mermaid">
+graph TB
+    UI["Browser\nQuery + Evals tabs"] -- "POST /api/query\nGET/POST /api/evals" --> API["FastAPI"]
+
+    API -- "question" --> GEN["OpenAI Responses API\n+ Lark Grammar"]
+    GEN -- "SQL candidate" --> VAL["SQL Validator\n(column allow-list, safety checks)"]
+    VAL -- "retry w/ error" --> GEN
+    VAL -- "valid SQL" --> CH[("ClickHouse\nearthquakes")]
+
+    API -- "run evals" --> EVAL["inspect-ai\nCFG vs No CFG\n(39 cases, 6 scorers)"]
+    EVAL --> GEN
+    EVAL --> LOGS[("Eval Logs")]
+    LOGS --> API
+
+    USGS["USGS Feed\n(bootstrap)"] -.-> CH
+
+    style UI fill:#cceaf2,stroke:#1164a3,color:#1d1c1d
+    style API fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style GEN fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style VAL fill:#fff3cd,stroke:#f59e0b,color:#1d1c1d
+    style CH fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style EVAL fill:#f3e8ff,stroke:#8b5cf6,color:#1d1c1d
+    style LOGS fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style USGS fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+          </pre>
+        </section>
+
+        <section class="panel arch-section">
+          <div class="panel-head">
+            <h2>Eval Flow</h2>
+          </div>
+          <pre class="mermaid">
+flowchart LR
+    A["User clicks\nRun Evals"] --> B["Frontend\nPOST /api/evals/run"]
+    B --> C["FastAPI\nrun_evals()"]
+    C --> D["inspect-ai\nbenchmark cases"]
+    D --> E["CFG mode\nsame model"]
+    D --> F["No CFG mode\nsame model"]
+    E --> G[("logs/inspect")]
+    F --> G
+    G --> H["Summary loader\ncomparison dataframes"]
+    H --> I["GET /api/evals\nresponse payload"]
+    I --> J["Charts + tables\nCFG vs No CFG"]
+
+    style A fill:#cceaf2,stroke:#1164a3,color:#1d1c1d
+    style B fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style C fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style D fill:#f3e8ff,stroke:#8b5cf6,color:#1d1c1d
+    style E fill:#f3e8ff,stroke:#8b5cf6,color:#1d1c1d
+    style F fill:#f3e8ff,stroke:#8b5cf6,color:#1d1c1d
+    style G fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style H fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style I fill:#e5efff,stroke:#1164a3,color:#1d1c1d
+    style J fill:#cceaf2,stroke:#1164a3,color:#1d1c1d
+          </pre>
+          <ul class="arch-list">
+            <li><strong>One variable changes</strong> -- the eval runner holds the model and benchmark cases fixed, then flips only the CFG constraint on and off.</li>
+            <li><strong>Fresh results overwrite stale assumptions</strong> -- the page can request new runs instead of depending on whatever static logs happened to exist already.</li>
+            <li><strong>Plots are mode-based</strong> -- the UI compares <code>CFG</code> and <code>No CFG</code> directly for the active model, not a mixed set of unrelated models.</li>
+          </ul>
+        </section>
+
+        <section class="panel arch-section">
+          <div class="panel-head">
+            <h2>Why Grammar Constraints?</h2>
+          </div>
+          <pre class="mermaid">
+flowchart TB
+    subgraph Traditional["Traditional Text-to-SQL"]
+        P1["Prompt\nEngineering"] --> O1["Free-form\nLLM Output"]
+        O1 --> P2["Post-hoc\nParsing"]
+        P2 -- "Malformed SQL" --> ERR["Runtime\nError"]
+        P2 -- "Valid syntax" --> OK1["Execute"]
+    end
+
+    subgraph Constrained["Grammar-Constrained (This App)"]
+        P3["Prompt +\nLark Grammar"] --> O2["Constrained\nDecoding"]
+        O2 --> V2["Semantic\nValidation"]
+        V2 -- "Wrong columns" --> O2
+        V2 -- "Valid" --> OK2["Execute"]
+    end
+
+    style ERR fill:#fee2e2,stroke:#ef4444,color:#1d1c1d
+    style OK1 fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style OK2 fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+    style O1 fill:#fff3cd,stroke:#f59e0b,color:#1d1c1d
+    style O2 fill:#d4edda,stroke:#2eb67d,color:#1d1c1d
+          </pre>
+          <ul class="arch-list">
+            <li><strong>Syntactically valid by construction</strong> -- the model cannot produce tokens that violate the grammar.</li>
+            <li><strong>Injection-proof</strong> -- prompt manipulation cannot escape the grammar's structural constraints.</li>
+            <li><strong>Validator focuses on semantics</strong> -- only checks column names and safety invariants, not syntax.</li>
+            <li><strong>A/B evals stay honest</strong> -- the benchmark now measures the effect of CFG directly by running the same cases with and without the grammar constraint.</li>
+          </ul>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span>OpenAI</span>
+      <span class="footer-sep"></span>
+      <span>ClickHouse</span>
+      <span class="footer-sep"></span>
+      <span>FastAPI</span>
+      <span class="footer-sep"></span>
+      <span>inspect-ai</span>
+    </footer>
+
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: {
+        primaryColor: '#e5efff', primaryBorderColor: '#1164a3', primaryTextColor: '#1d1c1d',
+        lineColor: '#2eb67d', secondaryColor: '#f7fbff', tertiaryColor: '#cceaf2',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontSize: '13px',
+      }});
+      window.__mermaid = mermaid;
+    </script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
