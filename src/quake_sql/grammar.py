@@ -74,7 +74,7 @@ time_value: "now()"i
           | DATETIME_STRING
 
 relative_time_expr: "now()"i "-" "INTERVAL"i INT TIME_UNIT
-                  | "today()"i "-" INT DAY_UNIT
+                  | "today()"i "-" INT
                   | "toStartOfDay"i "(" "now()"i ")" "-" "INTERVAL"i INT DAY_UNIT
                   | "toStartOfHour"i "(" "now()"i ")" "-" "INTERVAL"i INT TIME_UNIT
 

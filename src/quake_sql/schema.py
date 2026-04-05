@@ -130,7 +130,7 @@ def schema_prompt() -> str:
             "- Use ClickHouse functions such as `count`, `avg`, `sum`, `min`, `max`, `toDate`, `toStartOfHour`, `toStartOfDay`, `toStartOfWeek`, and `toStartOfMonth` when helpful.",
             "- Use `event_time` for time filtering unless the request explicitly asks about updates.",
             "- For recent windows, prefer `event_time >= now() - INTERVAL <n> <UNIT>`.",
-            "- For `yesterday`, prefer `toDate(event_time) = today() - 1`.",
+            "- For `yesterday`, prefer `toDate(event_time) = today() - 1`. Do not append a DAY unit.",
             "- This table is already the earthquake dataset. Do not add `event_type = 'earthquake'` for generic earthquake phrasing.",
             "- Only filter on `event_type` when the user explicitly asks about event types or names a non-default event type.",
             "- For geography text such as `in Alaska`, prefer `region ILIKE '%Alaska%'` over exact equality unless the user explicitly asks for an exact region value.",

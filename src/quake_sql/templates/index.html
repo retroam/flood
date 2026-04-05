@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -53,7 +54,7 @@
               <span id="status" class="status">Ready.</span>
             </div>
           </form>
-          <p class="examples-label">Try an example:</p>
+          <p class="examples-label">Try an example</p>
           <div class="examples">
             {% for example in examples %}
             <button class="example-chip" data-example="{{ example }}">{{ example }}</button>
@@ -61,7 +62,7 @@
           </div>
         </section>
 
-        <section class="sql-section">
+        <div class="sql-result-row">
           <article class="panel output-panel">
             <div class="panel-head">
               <h2>Generated SQL</h2>
@@ -72,17 +73,15 @@
             </div>
             <pre id="sql-output" class="code-block placeholder-text">Submit a question to see the generated SQL.</pre>
           </article>
-        </section>
 
-        <details id="result-details" class="panel collapsible">
-          <summary class="collapsible-header">
-            <h2>Result Set <span id="row-badge" class="row-badge" style="display:none;"></span></h2>
-            <span class="muted">Live ClickHouse query</span>
-          </summary>
-          <div class="collapsible-body">
+          <article id="result-details" class="panel output-panel">
+            <div class="panel-head">
+              <h2>Result Set <span id="row-badge" class="row-badge" style="display:none;"></span></h2>
+              <span class="muted">Live ClickHouse query</span>
+            </div>
             <div id="result-output" class="result-shell placeholder-text">No query has been run yet.</div>
-          </div>
-        </details>
+          </article>
+        </div>
 
         <details id="metrics-details" class="panel collapsible">
           <summary class="collapsible-header">
@@ -91,6 +90,7 @@
           </summary>
           <div class="collapsible-body">
             <dl id="metrics-output" class="metrics-list">
+              <div><dt>Mode</dt><dd>n/a</dd></div>
               <div><dt>Latency</dt><dd>n/a</dd></div>
               <div><dt>Estimated cost</dt><dd>n/a</dd></div>
               <div><dt>Total tokens</dt><dd>n/a</dd></div>
@@ -374,13 +374,13 @@ flowchart TB
     </main>
 
     <footer class="footer">
-      <span>OpenAI</span>
+      <a href="https://platform.openai.com" target="_blank" rel="noopener">OpenAI</a>
       <span class="footer-sep"></span>
-      <span>ClickHouse</span>
+      <a href="https://clickhouse.com" target="_blank" rel="noopener">ClickHouse</a>
       <span class="footer-sep"></span>
-      <span>FastAPI</span>
+      <a href="https://fastapi.tiangolo.com" target="_blank" rel="noopener">FastAPI</a>
       <span class="footer-sep"></span>
-      <span>inspect-ai</span>
+      <a href="https://inspect.ai-safety-institute.org.uk" target="_blank" rel="noopener">inspect-ai</a>
     </footer>
 
     <script type="module">

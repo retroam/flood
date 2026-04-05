@@ -119,7 +119,7 @@ class TestGrammarAccepts:
 
     def test_relative_time_today_minus(self, parser):
         parser.parse(
-            "SELECT count(*) FROM earthquakes WHERE event_time >= today() - 7 DAY"
+            "SELECT count(*) FROM earthquakes WHERE event_time >= today() - 7"
         )
 
     def test_all_numeric_columns(self, parser):
