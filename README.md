@@ -25,7 +25,7 @@ The app ships with a [Dockerfile](Dockerfile). Set environment variables on your
 
 ## Evals
 
-38 benchmark cases comparing CFG vs free-form generation, scored on accuracy, hallucination, latency, and cost. See [evals/cases.json](evals/cases.json).
+10 benchmark cases (top-10 subset) comparing CFG vs free-form generation, scored on accuracy, hallucination, latency, and cost. A full 48-case suite is also available. See [evals/cases.json](evals/cases.json) and [evals/cases_full48.json](evals/cases_full48.json).
 
 ```bash
 uv run inspect eval src/quake_sql/evals.py@quake_sql_benchmark --model openai/gpt-5.4-mini
